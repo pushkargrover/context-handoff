@@ -5,7 +5,7 @@
 $ErrorActionPreference = 'Stop'
 # Pin the environment: a leaked threshold override would corrupt every
 # boundary assertion below. Tests own their inputs.
-if (Test-Path env:CONTEXT_HANDOFF_THRESHOLD) { Remove-Item env:CONTEXT_HANDOFF_THRESHOLD }
+if (Test-Path env:RELAY_THRESHOLD) { Remove-Item env:RELAY_THRESHOLD }
 $trigger  = Join-Path $PSScriptRoot '..\scripts\trigger.ps1'
 $fixtures = Join-Path $PSScriptRoot 'fixtures'
 $lockDir  = Join-Path $env:USERPROFILE '.claude\handoffs\.locks'
@@ -49,7 +49,7 @@ function Clear-Lock([string]$session) {
     if (Test-Path $f) { Remove-Item $f -Force -Confirm:$false }
 }
 
-Write-Host "context-handoff trigger tests"
+Write-Host "relay trigger tests"
 Write-Host "-----------------------------"
 
 # --- Case 1: 50% usage -> silent ---------------------------------------------

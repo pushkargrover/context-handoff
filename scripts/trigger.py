@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""trigger.py - context-handoff plugin (mac/Linux; invoked via trigger.sh).
+"""trigger.py - Relay plugin (mac/Linux; invoked via trigger.sh).
 
 Mirrors scripts/trigger.ps1 exactly:
   UserPromptSubmit - read real token usage from the session transcript (JSONL)
@@ -20,7 +20,7 @@ TAIL_LINES = 100
 
 def threshold():
     t = 0.90
-    raw = os.environ.get("CONTEXT_HANDOFF_THRESHOLD")
+    raw = os.environ.get("RELAY_THRESHOLD")
     if raw:
         try:
             v = float(raw)
@@ -135,7 +135,7 @@ def main():
         else "Context usage has reached {}% of the window.".format(usage_pct)
     )
 
-    instruction = """[context-handoff] {reason} Before continuing with the user's request, write a session handoff document so progress survives.
+    instruction = """[relay] {reason} Before continuing with the user's request, write a session handoff document so progress survives.
 
 1. Create the directory if needed: {handoffs_dir}
 2. Write the handoff to exactly: {handoff_file}

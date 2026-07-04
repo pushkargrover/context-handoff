@@ -1,9 +1,9 @@
 {
-  "name": "context-handoff",
+  "name": "relay",
   "version": "1.0.0",
-  "description": "Auto-generates structured handoff documents before context compaction and via /handoff.",
+  "description": "Monitors context usage live and auto-writes a structured handoff document at 90% so your work survives compaction and resumes in any AI agent.",
   "author": { "name": "Pushkar Grover" },
-  "repository": "https://github.com/pushkargrover/context-handoff",
+  "repository": "https://github.com/pushkargrover/relay",
   "license": "MIT",
-  "keywords": ["context", "handoff", "session", "compaction", "continuity"]
+  "keywords": ["context", "handoff", "session", "compaction", "continuity", "relay"]
 }

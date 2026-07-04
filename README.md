@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="assets/banner.svg" alt="context-handoff — save your session before the context window fills" width="820">
+<img src="assets/banner.svg" alt="Relay: save your session before the context window fills" width="820">
 
 <br>
 
@@ -10,7 +10,7 @@
 ![Tests](https://img.shields.io/badge/tests-35%20passing-3fb950?style=flat-square&labelColor=0b0e14)
 ![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-d29922?style=flat-square&labelColor=0b0e14)
 
-**Never lose your session progress again.** Monitors your context usage live and automatically writes a structured handoff document at 90% — before compaction erases your work. Resume in any AI agent: Claude, Codex, Gemini, Copilot.
+**Never lose your session progress again.** Relay monitors your context usage live and automatically writes a structured handoff document at 90%, before compaction erases your work. Resume in any AI agent: Claude, Codex, Gemini, Copilot.
 
 </div>
 
@@ -18,33 +18,34 @@
 
 ## Install
 
-Type these **inside Claude Code** (not a terminal — they're `/` slash commands):
+Type these **inside Claude Code** (not a terminal; they are `/` slash commands):
 
 ```text
-/plugin marketplace add pushkargrover/context-handoff
-/plugin install context-handoff@grove-plugins
+/plugin marketplace add pushkargrover/relay
+/plugin install relay@grove-plugins
 ```
 
-Then restart Claude Code — hooks load at session start. No npm, no pip, no runtime.
+Then restart Claude Code so hooks load at session start. No npm, no pip, no runtime.
 
 ---
 
 ## What it does
 
 ```console
-every turn   ──▶  read real token usage from the session transcript
-     │
-     ▼
- ≥ 90% ?     ──▶  instruct Claude to write an 8-section handoff (once per session)
-     │
-     ▼
- compaction  ──▶  PreCompact backstop fires the same handoff, just in case
+every turn   ==>  read real token usage from the session transcript
+     |
+     v
+ >= 90% ?    ==>  instruct Claude to write an 8-section handoff (once per session)
+     |
+     v
+ compaction  ==>  PreCompact backstop fires the same handoff, just in case
 ```
 
-- **Real counts, not estimates** — reads the exact token usage every assistant message records in the transcript.
-- **Zero dependencies** — no daemon, nothing to keep running. The check rides on a hook that already fires each turn.
-- **Never breaks your session** — every failure path exits silently. A monitor must not harm what it monitors.
-- **On demand** — run `/handoff` any time.
+- **Real counts, not estimates.** Relay reads the exact token usage that every assistant message records in the transcript.
+- **Zero dependencies.** No daemon, nothing to keep running. The check rides on a hook that already fires each turn.
+- **Never breaks your session.** Every failure path exits silently. A monitor must not harm what it monitors.
+- **Free to run.** The check reads a local file and does arithmetic. No API call, no tokens, no impact on your usage limits.
+- **On demand.** Run `/handoff` any time.
 
 ---
 
@@ -81,10 +82,10 @@ Read handoffs/handoff-2026-07-04-143022.md and continue the work described there
 Change the threshold (default `0.90`) via environment variable in `settings.json`:
 
 ```json
-{ "env": { "CONTEXT_HANDOFF_THRESHOLD": "0.80" } }
+{ "env": { "RELAY_THRESHOLD": "0.80" } }
 ```
 
-Add or adjust model context windows in [`scripts/context-limits.json`](scripts/context-limits.json) — longest model-ID prefix wins; `_default` covers unknown models conservatively.
+Add or adjust model context windows in [`scripts/context-limits.json`](scripts/context-limits.json). The longest model-ID prefix wins, and `_default` covers unknown models conservatively.
 
 ---
 
@@ -93,15 +94,15 @@ Add or adjust model context windows in [`scripts/context-limits.json`](scripts/c
 
 <br>
 
-Claude Code writes each session as a JSONL transcript where every assistant message records exact token usage. On each `UserPromptSubmit`, a tiny script (PowerShell on Windows, `sh` + Python 3 on macOS/Linux — both already on your machine) tails that file, sums `input + cache_read + cache_creation` tokens from the newest record, and divides by the model's context limit. At the threshold it emits `additionalContext` telling Claude to write the handoff.
+Claude Code writes each session as a JSONL transcript where every assistant message records exact token usage. On each `UserPromptSubmit`, a tiny script (PowerShell on Windows, `sh` + Python 3 on macOS/Linux, both already on your machine) tails that file, sums `input + cache_read + cache_creation` tokens from the newest record, and divides by the model's context limit. At the threshold it emits `additionalContext` telling Claude to write the handoff.
 
-The script only **detects** — Claude does the **synthesizing**, because only the model can explain its own decisions and next steps.
+The script only **detects**. Claude does the **synthesizing**, because only the model can explain its own decisions and next steps.
 
 **Design principles**
 
-- The monitor never breaks the session it monitors — every failure path exits `0` silently.
-- Fires exactly once per session — a lockfile keyed by session ID.
-- Zero dependencies — no daemon, no runtime, nothing to keep running.
+- The monitor never breaks the session it monitors. Every failure path exits `0` silently.
+- Fires exactly once per session, using a lockfile keyed by session ID.
+- Zero dependencies. No daemon, no runtime, nothing to keep running.
 
 </details>
 
@@ -111,9 +112,9 @@ The script only **detects** — Claude does the **synthesizing**, because only t
 
 | Platform | Status |
 | --- | --- |
-| Windows (PowerShell 5.1+) | ✅ |
-| macOS / Linux (`sh` + Python 3) | ✅ |
-| Plain claude.ai chat | ❌ — no hook/filesystem support there (platform limit) |
+| Windows (PowerShell 5.1+) | Supported |
+| macOS / Linux (`sh` + Python 3) | Supported |
+| Plain claude.ai chat | Not supported (no hook or filesystem access there) |
 
 ---
 
@@ -133,6 +134,6 @@ Both suites assert the same contract: boundary behavior at 89 / 90 / 91%, once-p
 
 <div align="center">
 
-MIT © <a href="https://github.com/pushkargrover">Pushkar Grover</a>
+MIT &copy; <a href="https://github.com/pushkargrover">Pushkar Grover</a>
 
 </div>

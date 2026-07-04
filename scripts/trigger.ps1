@@ -1,9 +1,9 @@
-# trigger.ps1 — context-handoff plugin
+# trigger.ps1 - Relay plugin
 #
 # Runs on two hook events (routed via hooks.json):
-#   UserPromptSubmit — every user turn: read real token usage from the session
+#   UserPromptSubmit - every user turn: read real token usage from the session
 #                      transcript (JSONL) and fire a handoff instruction at >=90%.
-#   PreCompact       — backstop: if compaction is imminent and no handoff was
+#   PreCompact       - backstop: if compaction is imminent and no handoff was
 #                      written this session, fire unconditionally.
 #
 # Contract with Claude Code:
@@ -16,12 +16,12 @@ param()
 $ErrorActionPreference = 'Stop'
 
 # The threshold as a fraction of the model's context window.
-# Override with env var CONTEXT_HANDOFF_THRESHOLD (e.g. "0.80"), useful for
+# Override with env var RELAY_THRESHOLD (e.g. "0.80"), useful for
 # users who want earlier handoffs and for end-to-end testing.
 $Threshold = 0.90
-if ($env:CONTEXT_HANDOFF_THRESHOLD) {
+if ($env:RELAY_THRESHOLD) {
     $parsed = 0.0
-    if ([double]::TryParse($env:CONTEXT_HANDOFF_THRESHOLD, [ref]$parsed) -and $parsed -gt 0 -and $parsed -le 1) {
+    if ([double]::TryParse($env:RELAY_THRESHOLD, [ref]$parsed) -and $parsed -gt 0 -and $parsed -le 1) {
         $Threshold = $parsed
     }
 }
@@ -136,7 +136,7 @@ try {
               else { "Context usage has reached $usagePct% of the window." }
 
     $instruction = @"
-[context-handoff] $reason Before continuing with the user's request, write a session handoff document so progress survives.
+[relay] $reason Before continuing with the user's request, write a session handoff document so progress survives.
 
 1. Create the directory if needed: $handoffsDir
 2. Write the handoff to exactly: $handoffFile

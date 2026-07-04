@@ -5,12 +5,12 @@
   <circle cx="36" cy="30" r="6" fill="#ff5f56"/>
   <circle cx="58" cy="30" r="6" fill="#ffbd2e"/>
   <circle cx="80" cy="30" r="6" fill="#27c93f"/>
-  <text x="410" y="34" text-anchor="middle" font-size="13" fill="#8b949e">context-handoff — ~/projects</text>
+  <text x="410" y="34" text-anchor="middle" font-size="13" fill="#8b949e">relay : ~/projects</text>
 
-  <text x="40" y="100" font-size="27" font-weight="700" fill="#3fb950">context-handoff</text>
+  <text x="40" y="100" font-size="27" font-weight="700" fill="#3fb950">relay</text>
   <text x="40" y="130" font-size="15" fill="#6e7681"># save your session before the context window fills</text>
 
-  <text x="40" y="176" font-size="16" fill="#3fb950">$ <tspan fill="#c9d1d9">/plugin install context-handoff@grove-plugins</tspan></text>
+  <text x="40" y="176" font-size="16" fill="#3fb950">$ <tspan fill="#c9d1d9">/plugin install relay@grove-plugins</tspan></text>
 
   <text x="40" y="222" font-size="15" fill="#8b949e">usage</text>
   <rect x="110" y="210" width="360" height="16" rx="4" fill="#21262d"/>

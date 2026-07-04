@@ -1,5 +1,5 @@
 {
-  "description": "context-handoff: per-turn 90% context check (UserPromptSubmit) with a compaction backstop (PreCompact). Both a PowerShell and an sh command are registered per event; the one that does not exist on the current OS fails silently (non-blocking), and trigger.sh additionally no-ops on Windows so the pair never double-fires.",
+  "description": "Relay: per-turn 90% context check (UserPromptSubmit) with a compaction backstop (PreCompact). Both a PowerShell and an sh command are registered per event; the one that does not exist on the current OS fails silently (non-blocking), and trigger.sh additionally no-ops on Windows so the pair never double-fires.",
   "hooks": {
     "UserPromptSubmit": [
       {

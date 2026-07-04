@@ -1,5 +1,5 @@
 #!/bin/sh
-# trigger.sh - context-handoff plugin (mac/Linux launcher).
+# trigger.sh - Relay plugin (mac/Linux launcher).
 # Finds a Python 3 interpreter and hands stdin straight to trigger.py.
 # If none exists, exits 0 silently: a monitoring hook must never block the user.
 

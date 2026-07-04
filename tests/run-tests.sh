@@ -4,7 +4,7 @@
 # Usage: sh tests/run-tests.sh          Exit 0 = all pass, 1 = failures.
 
 # Pin the environment: a leaked threshold override corrupts boundary asserts.
-unset CONTEXT_HANDOFF_THRESHOLD
+unset RELAY_THRESHOLD
 
 DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 TRIGGER="$DIR/../scripts/trigger.py"
@@ -50,7 +50,7 @@ hookinput() { # transcript session event [cwd]
 
 clearlock() { rm -f "$LOCKDIR/$1.lock"; }
 
-echo "context-handoff trigger.py tests"
+echo "relay trigger.py tests"
 echo "--------------------------------"
 
 # 1: 50% silent
@@ -131,7 +131,7 @@ out=$(printf 'not-json-at-all' | "$PY" "$TRIGGER"); rc=$?
 # 13: threshold env override honored
 s=sh-envthresh; clearlock $s
 t=$(fixture usage-env.jsonl 3000 94000 claude-opus-4-8 3000)   # 50%
-out=$(printf '%s' "$(hookinput "$t" $s UserPromptSubmit)" | CONTEXT_HANDOFF_THRESHOLD=0.40 "$PY" "$TRIGGER")
+out=$(printf '%s' "$(hookinput "$t" $s UserPromptSubmit)" | RELAY_THRESHOLD=0.40 "$PY" "$TRIGGER")
 [ -n "$out" ]; assert $? "env threshold override (0.40) fires at 50%"; clearlock $s
 
 echo "--------------------------------"

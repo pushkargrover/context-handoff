@@ -143,7 +143,15 @@ def resolve_model(model_arg):
 
 
 def invoke_ollama(model, prompt):
-    body = json.dumps({"model": model, "prompt": prompt, "stream": False}).encode("utf-8")
+    # Ollama defaults to a tiny ~4K context window regardless of what the model
+    # supports, which starves the output on large transcripts (partial or empty
+    # handoffs). Open the window explicitly so there is room for input + output.
+    num_ctx = 8192
+    raw = os.environ.get("RELAY_OLLAMA_NUM_CTX")
+    if raw and raw.isdigit() and int(raw) > 0:
+        num_ctx = int(raw)
+    body = json.dumps({"model": model, "prompt": prompt, "stream": False,
+                       "options": {"num_ctx": num_ctx}}).encode("utf-8")
     req = urllib.request.Request(OLLAMA_URL + "/api/generate", data=body,
                                  headers={"Content-Type": "application/json"}, method="POST")
     with urllib.request.urlopen(req, timeout=600) as r:

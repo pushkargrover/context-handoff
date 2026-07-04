@@ -122,6 +122,7 @@ Change the thresholds via environment variables in `settings.json`:
 - `RELAY_EMERGENCY_THRESHOLD` (default `0.95`) is the mid-task check that runs after each tool call. Keep it higher than `RELAY_THRESHOLD` so long tasks are interrupted only when genuinely close to the limit.
 - `RELAY_OLLAMA_MODEL` (local mode) picks the Ollama model; if unset, the first installed model is auto-detected.
 - `RELAY_OLLAMA_URL` (local mode) overrides the Ollama endpoint (default `http://localhost:11434`).
+- `RELAY_OLLAMA_NUM_CTX` (local mode) sets Ollama's context window (default `8192`). Raise it if handoffs from very large sessions come out truncated; lower it to save memory.
 
 Add or adjust model context windows in [`scripts/context-limits.json`](scripts/context-limits.json). The longest model-ID prefix wins, and `_default` covers unknown models conservatively.
 

@@ -126,7 +126,15 @@ function Resolve-Model {
 }
 
 function Invoke-Ollama($model, $prompt) {
-    $body = @{ model = $model; prompt = $prompt; stream = $false } | ConvertTo-Json -Depth 5
+    # Ollama defaults to a tiny ~4K context window regardless of what the model
+    # supports, which starves the output on large transcripts (partial or empty
+    # handoffs). Open the window explicitly so there is room for input + output.
+    $numCtx = 8192
+    if ($env:RELAY_OLLAMA_NUM_CTX) {
+        $n = 0
+        if ([int]::TryParse($env:RELAY_OLLAMA_NUM_CTX, [ref]$n) -and $n -gt 0) { $numCtx = $n }
+    }
+    $body = @{ model = $model; prompt = $prompt; stream = $false; options = @{ num_ctx = $numCtx } } | ConvertTo-Json -Depth 5
     # Send as explicit UTF-8 bytes: PS 5.1 encodes a string body as Latin-1,
     # which corrupts any non-ASCII content (emoji, box chars) and breaks the JSON.
     $bytes = [System.Text.Encoding]::UTF8.GetBytes($body)

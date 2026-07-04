@@ -7,7 +7,7 @@
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-3fb950?style=flat-square&labelColor=0b0e14)
 ![License](https://img.shields.io/badge/license-MIT-58a6ff?style=flat-square&labelColor=0b0e14)
 ![Dependencies](https://img.shields.io/badge/dependencies-zero-3fb950?style=flat-square&labelColor=0b0e14)
-![Tests](https://img.shields.io/badge/tests-43%20passing-3fb950?style=flat-square&labelColor=0b0e14)
+![Tests](https://img.shields.io/badge/tests-56%20passing-3fb950?style=flat-square&labelColor=0b0e14)
 ![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-d29922?style=flat-square&labelColor=0b0e14)
 
 **Never lose your session progress again.** Relay monitors your context usage live and automatically writes a structured handoff document at 90%, before compaction erases your work. Resume in any AI agent: Claude, Codex, Gemini, Copilot.
@@ -81,6 +81,37 @@ Read handoffs/handoff-2026-07-04-143022.md and continue the work described there
 
 ---
 
+## Local mode — recover even after a lockout (optional, Ollama)
+
+The triggers above rely on Claude to write the handoff — which fails in the one case you most need it: when you've **hit your plan limit and Claude is locked out**. Local mode fixes that by generating the handoff with a **local model via [Ollama](https://ollama.com)** — no Anthropic account, no internet, zero tokens.
+
+**Setup (once):** install Ollama and pull a small model:
+```text
+ollama pull gemma4
+```
+
+**After a lockout — run it in a terminal** (Claude isn't needed at all):
+```text
+# Windows
+powershell -File <plugin>\scripts\relay-recover.ps1
+
+# macOS / Linux
+python3 <plugin>/scripts/relay-recover.py
+```
+It finds your most recent session, feeds it to the local model, and writes `handoffs/handoff-<ts>-local.md` in the current folder. Useful flags:
+
+```text
+relay-recover --list        # pick from recent sessions
+relay-recover 2             # recover the 2nd most recent
+relay-recover --model qwen3.6
+```
+
+**Before a lockout** (while Claude still works), run `/handoff-local` inside Claude Code for the same local synthesis on demand.
+
+> Local models are slower (~1–3 min per handoff) and rougher than Claude, but a handoff you got *after lockout* beats the perfect one you couldn't. If Ollama isn't installed, the normal Claude-written handoffs are unaffected.
+
+---
+
 ## Configuration
 
 Change the thresholds via environment variables in `settings.json`:
@@ -91,6 +122,8 @@ Change the thresholds via environment variables in `settings.json`:
 
 - `RELAY_THRESHOLD` (default `0.90`) is the turn-boundary check.
 - `RELAY_EMERGENCY_THRESHOLD` (default `0.95`) is the mid-task check that runs after each tool call. Keep it higher than `RELAY_THRESHOLD` so long tasks are interrupted only when genuinely close to the limit.
+- `RELAY_OLLAMA_MODEL` (local mode) picks the Ollama model; if unset, the first installed model is auto-detected.
+- `RELAY_OLLAMA_URL` (local mode) overrides the Ollama endpoint (default `http://localhost:11434`).
 
 Add or adjust model context windows in [`scripts/context-limits.json`](scripts/context-limits.json). The longest model-ID prefix wins, and `_default` covers unknown models conservatively.
 
@@ -128,11 +161,14 @@ The script only **detects**. Claude does the **synthesizing**, because only the 
 ## Running the tests
 
 ```console
-# Windows
+# Windows (trigger hooks)
 $ powershell -NoProfile -File tests\run-tests.ps1
 
-# macOS / Linux
+# macOS / Linux (trigger hooks)
 $ sh tests/run-tests.sh
+
+# local-mode parsing (any platform with Python 3)
+$ python tests/test-recover.py
 ```
 
 Both suites assert the same contract: boundary behavior at 89 / 90 / 91%, once-per-session locking, the `PreCompact` backstop, mid-write transcript tolerance, unknown-model fallback, and save-location rules.

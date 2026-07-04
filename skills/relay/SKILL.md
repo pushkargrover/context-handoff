@@ -48,6 +48,16 @@ Every handoff contains these 8 sections:
 7. **Key File Paths**: files to read immediately when resuming
 8. **Instructions for Next Agent**: conventions, warnings, non-obvious context
 
+## Local Mode (Ollama) — Lockout Recovery
+
+Relay can also generate a handoff with a **local** model via Ollama, using zero Anthropic tokens — useful when the account is rate-limited/locked out and Claude can't write the handoff itself.
+
+- **After a lockout**, the user runs the standalone script in a terminal (no Claude needed): `relay-recover.ps1` (Windows) or `relay-recover.py` (mac/Linux). Flags: `--list`, a bare index, `--session <id>`, `--model <name>`, `--out <path>`.
+- **Before a lockout**, the `/handoff-local` command does the same local synthesis on demand.
+- Requires Ollama installed with a model pulled (e.g. `ollama pull gemma4`). Model via `RELAY_OLLAMA_MODEL`, endpoint via `RELAY_OLLAMA_URL`.
+
+If the user asks how to recover work after hitting their limit, or how to make a handoff without spending tokens, point them to local mode.
+
 ## Resuming From a Handoff
 
 Tell any AI agent:

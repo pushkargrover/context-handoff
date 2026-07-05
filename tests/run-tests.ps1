@@ -4,7 +4,7 @@
 
 $ErrorActionPreference = 'Stop'
 # Pin the environment: a leaked budget override would corrupt boundary asserts.
-foreach ($v in 'RELAY_TOKEN_THRESHOLD','RELAY_EMERGENCY_TOKEN_THRESHOLD') {
+foreach ($v in 'RELAY_TOKEN_THRESHOLD','RELAY_EMERGENCY_TOKEN_THRESHOLD','RELAY_PLAN_THRESHOLD','RELAY_DEBUG') {
     if (Test-Path "env:$v") { Remove-Item "env:$v" }
 }
 $trigger  = Join-Path $PSScriptRoot '..\scripts\trigger.ps1'
@@ -45,6 +45,19 @@ function Clear-Lock([string]$session) {
         $f = Join-Path $lockDir "$session.$ext"
         if (Test-Path $f) { Remove-Item $f -Force -Confirm:$false }
     }
+}
+function New-StopInput([string]$session, $fiveHourPct, [string]$cwd = $env:TEMP,
+                       [bool]$hasRateLimits = $true, [bool]$hasFiveHour = $true, [bool]$useWorkspace = $false) {
+    # Builds the rich Stop-hook payload (per official Claude Code statusline schema).
+    $h = [ordered]@{ session_id = $session; hook_event_name = 'Stop'; transcript_path = 'x' }
+    if ($useWorkspace) { $h.workspace = @{ current_dir = $cwd } } else { $h.cwd = $cwd }
+    if ($hasRateLimits) {
+        $rl = [ordered]@{}
+        if ($hasFiveHour) { $rl.five_hour = @{ used_percentage = $fiveHourPct; resets_at = 1738425600 } }
+        $rl.seven_day = @{ used_percentage = 41.2; resets_at = 1738857600 }
+        $h.rate_limits = $rl
+    }
+    return ($h | ConvertTo-Json -Depth 6 -Compress)
 }
 
 Write-Host "relay trigger tests (token budgets: normal=$NORMAL emergency=$EMERG)"
@@ -143,6 +156,54 @@ Assert ($LASTEXITCODE -eq 0) "missing transcript exits 0"
 $out = 'not-json' | powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $trigger
 Assert (-not $out) "garbage stdin stays silent"
 Assert ($LASTEXITCODE -eq 0) "garbage stdin exits 0"
+
+# ---- Plan-usage trigger (Stop hook reads rate_limits.five_hour.used_percentage) ----
+
+# P1: below the plan threshold -> silent
+$s='p-below'; Clear-Lock $s
+Assert (-not (Invoke-Trigger (New-StopInput $s 85))) "plan 85% stays silent (below 90)"; Clear-Lock $s
+
+# P2: exactly at threshold -> fires (inclusive), message names the 5-hour plan limit
+$s='p-90'; Clear-Lock $s
+$out = Invoke-Trigger (New-StopInput $s 90)
+$json = $null; try { $json = $out | ConvertFrom-Json } catch {}
+Assert ($null -ne $json) "plan 90% fires (inclusive)"
+Assert ($json -and $json.hookSpecificOutput.additionalContext -match '(?i)plan') "message names the plan limit"
+Assert ($json -and $json.hookSpecificOutput.additionalContext -match '90') "message reports the plan percentage"; Clear-Lock $s
+
+# P3: fractional percentage above threshold -> fires
+$s='p-925'; Clear-Lock $s
+$out = Invoke-Trigger (New-StopInput $s 92.5)
+$json = $null; try { $json = $out | ConvertFrom-Json } catch {}
+Assert ($null -ne $json) "plan 92.5% fires"
+Assert ($json -and $json.hookSpecificOutput.additionalContext -match '92') "fractional percentage reported"; Clear-Lock $s
+
+# P4: rate_limits absent (not Pro/Max, or before first API response) -> silent
+$s='p-none'; Clear-Lock $s
+Assert (-not (Invoke-Trigger (New-StopInput $s 99 $env:TEMP $false))) "no rate_limits stays silent (graceful)"; Clear-Lock $s
+
+# P5: rate_limits present but five_hour window absent -> silent
+$s='p-no5h'; Clear-Lock $s
+Assert (-not (Invoke-Trigger (New-StopInput $s 99 $env:TEMP $true $false))) "missing five_hour window stays silent"; Clear-Lock $s
+
+# P6: RELAY_PLAN_THRESHOLD override
+$s='p-env'; Clear-Lock $s
+$env:RELAY_PLAN_THRESHOLD = '50'
+$out = $(New-StopInput $s 60) | powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $trigger
+Remove-Item env:RELAY_PLAN_THRESHOLD
+Assert ([bool]$out) "RELAY_PLAN_THRESHOLD override fires at 60% when lowered to 50"; Clear-Lock $s
+
+# P7: fires once per session (shared lock)
+$s='p-lock'; Clear-Lock $s
+Invoke-Trigger (New-StopInput $s 95) | Out-Null
+Assert (-not (Invoke-Trigger (New-StopInput $s 95))) "second plan crossing stays silent (lock)"; Clear-Lock $s
+
+# P8: falls back to workspace.current_dir when cwd is absent
+$s='p-workspace'; Clear-Lock $s
+$out = Invoke-Trigger (New-StopInput $s 95 $env:TEMP $true $true $true)
+$json = $null; try { $json = $out | ConvertFrom-Json } catch {}
+Assert ($null -ne $json) "plan fires using workspace.current_dir when cwd absent"
+Assert ($json -and $json.hookSpecificOutput.additionalContext -match [regex]::Escape((Join-Path $env:TEMP 'handoffs'))) "workspace.current_dir used for handoff path"; Clear-Lock $s
 
 Write-Host "-----------------------------"
 Write-Host "$script:passed passed, $script:failed failed"

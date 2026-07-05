@@ -44,6 +44,11 @@ def emergency_token_threshold():
     return budget_env("RELAY_EMERGENCY_TOKEN_THRESHOLD", 190000)
 
 
+def plan_threshold():
+    # Percent (0-100) of the 5-hour rolling plan limit that triggers a handoff.
+    return budget_env("RELAY_PLAN_THRESHOLD", 90)
+
+
 def read_context_tokens(transcript_path):
     """Newest assistant usage record ~= full current context size."""
     with open(transcript_path, "r", encoding="utf-8", errors="replace") as f:
@@ -79,6 +84,9 @@ def main():
     project_dir = hook_input.get("cwd")
     event_name = hook_input.get("hook_event_name")
     home = os.path.expanduser("~")
+    # The rich Stop/statusline payload uses workspace.current_dir instead of cwd.
+    if not project_dir:
+        project_dir = (hook_input.get("workspace") or {}).get("current_dir")
     if not project_dir or not os.path.isdir(project_dir):
         project_dir = os.getcwd()
 
@@ -107,9 +115,27 @@ def main():
 
     should_fire = False
     context_tokens = None
+    plan_pct = None
 
     if event_name == "PreCompact":
         should_fire = True
+    elif event_name == "Stop":
+        # Plan-usage check: read the 5-hour rolling limit from the payload.
+        # Every level may be absent (non-Pro/Max, or before the first API response).
+        pct = ((hook_input.get("rate_limits") or {}).get("five_hour") or {}).get("used_percentage")
+        if os.environ.get("RELAY_DEBUG"):
+            dbg_dir = os.path.join(home, ".claude", "handoffs")
+            os.makedirs(dbg_dir, exist_ok=True)
+            shown = pct if pct is not None else "absent"
+            with open(os.path.join(dbg_dir, ".relay-plan-debug.txt"), "a", encoding="utf-8") as f:
+                f.write("{} five_hour.used_percentage={}\n".format(datetime.now().isoformat(), shown))
+        if pct is None:
+            return
+        if float(pct) >= plan_threshold():
+            should_fire = True
+            plan_pct = float(pct)
+        else:
+            return
     else:
         if not transcript_path or not os.path.isfile(transcript_path):
             return
@@ -136,6 +162,8 @@ def main():
     token_str = "{:,}".format(context_tokens) if context_tokens else "many"
     if event_name == "PreCompact":
         reason = "Context compaction is imminent."
+    elif event_name == "Stop":
+        reason = "Your 5-hour plan usage has reached {}% (Pro/Max limit).".format(round(plan_pct, 1))
     elif event_name == "PostToolUse":
         reason = "Context has reached {} tokens mid-task.".format(token_str)
     else:

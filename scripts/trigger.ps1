@@ -37,6 +37,10 @@ function Get-BudgetEnv([string]$name, [long]$default) {
 $TokenThreshold = Get-BudgetEnv 'RELAY_TOKEN_THRESHOLD' 150000
 # Higher budget for the mid-task PostToolUse check (interrupt only when close).
 $EmergencyTokenThreshold = Get-BudgetEnv 'RELAY_EMERGENCY_TOKEN_THRESHOLD' 190000
+# Plan-usage trigger (Stop hook): fire when the 5-hour rolling plan limit reaches
+# this PERCENT (0-100). Data comes from rate_limits in the hook payload, which
+# Claude Code provides only to Pro/Max accounts after the first API response.
+$PlanThreshold = Get-BudgetEnv 'RELAY_PLAN_THRESHOLD' 90
 # Only scan the tail of the transcript; the newest usage record is near the end.
 $TailLines = 40
 # Do not run the expensive transcript read more than once per this many seconds
@@ -60,6 +64,11 @@ try {
     $projectDir     = Get-Prop $hookInput 'cwd'
     $eventName      = Get-Prop $hookInput 'hook_event_name'
     if (-not $sessionId) { $sessionId = 'unknown' }
+    # The rich Stop/statusline payload uses workspace.current_dir instead of cwd.
+    if (-not $projectDir) {
+        $ws = Get-Prop $hookInput 'workspace'
+        if ($ws) { $projectDir = Get-Prop $ws 'current_dir' }
+    }
     if (-not $projectDir -or -not (Test-Path $projectDir)) { $projectDir = (Get-Location).Path }
 
     $lockDir  = Join-Path $env:USERPROFILE '.claude\handoffs\.locks'
@@ -84,9 +93,26 @@ try {
     # ---- 4. Decide whether to fire ------------------------------------------
     $shouldFire = $false
     $contextTokens = $null
+    $planPct = $null
 
     if ($eventName -eq 'PreCompact') {
         $shouldFire = $true   # reliable near-full backstop
+    }
+    elseif ($eventName -eq 'Stop') {
+        # Plan-usage check: read the 5-hour rolling limit from the payload.
+        # Every level may be absent (non-Pro/Max, or before the first API response).
+        $rl  = Get-Prop $hookInput 'rate_limits'
+        $fh  = if ($rl) { Get-Prop $rl 'five_hour' } else { $null }
+        $pct = if ($fh) { Get-Prop $fh 'used_percentage' } else { $null }
+        if ($env:RELAY_DEBUG) {
+            $dbgDir = Join-Path $env:USERPROFILE '.claude\handoffs'
+            if (-not (Test-Path $dbgDir)) { New-Item -ItemType Directory -Force -Path $dbgDir | Out-Null }
+            $shown = if ($null -ne $pct) { $pct } else { 'absent' }
+            Add-Content -Path (Join-Path $dbgDir '.relay-plan-debug.txt') -Value "$(Get-Date -Format o) five_hour.used_percentage=$shown"
+        }
+        if ($null -eq $pct) { exit 0 }
+        if ([double]$pct -ge $PlanThreshold) { $shouldFire = $true; $planPct = [double]$pct }
+        else { exit 0 }
     }
     else {
         if (-not $transcriptPath -or -not (Test-Path $transcriptPath)) { exit 0 }
@@ -123,6 +149,7 @@ try {
     $handoffFile = Join-Path $handoffsDir "handoff-$timestamp.md"
     $tokenStr = if ($contextTokens) { "{0:N0}" -f $contextTokens } else { 'many' }
     $reason = if ($eventName -eq 'PreCompact') { 'Context compaction is imminent.' }
+              elseif ($eventName -eq 'Stop') { "Your 5-hour plan usage has reached $([math]::Round($planPct,1))% (Pro/Max limit)." }
               elseif ($eventName -eq 'PostToolUse') { "Context has reached $tokenStr tokens mid-task." }
               else { "Context has reached $tokenStr tokens." }
 

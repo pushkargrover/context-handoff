@@ -14,6 +14,8 @@ The plugin checks context on **every user turn** by reading the real token count
 
 For long single turns that never return to a prompt boundary, a **throttled mid-task check runs after tool calls** and fires at a higher emergency budget (default 190,000 tokens). A `PreCompact` backstop also fires right before compaction — this is the reliable near-full signal for any model, since Claude Code knows the true window.
 
+On **Pro/Max** accounts, Relay also watches your **5-hour plan usage**: at the end of each turn it reads `rate_limits.five_hour.used_percentage` from the `Stop`-hook payload and writes a handoff when it reaches `RELAY_PLAN_THRESHOLD` (default 90%), so a rate-limit lockout never catches you without a handoff. If the user asks about tracking their plan/subscription usage or the 5-hour limit, this is the relevant feature.
+
 Save locations:
 - Inside a project: `<project-root>/handoffs/handoff-YYYY-MM-DD-HHMMSS.md`
 - Session without a project (cwd is the home directory): `~/.claude/handoffs/handoff-YYYY-MM-DD-HHMMSS.md`

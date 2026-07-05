@@ -5,6 +5,8 @@
 # Pin the environment: a leaked budget override corrupts boundary asserts.
 unset RELAY_TOKEN_THRESHOLD
 unset RELAY_EMERGENCY_TOKEN_THRESHOLD
+unset RELAY_PLAN_THRESHOLD
+unset RELAY_DEBUG
 
 DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 TRIGGER="$DIR/../scripts/trigger.py"
@@ -34,6 +36,30 @@ fixture() { # name total_tokens [extra_line]
 }
 hookinput() { cwd="${4:-$FIXTURES}"; "$PY" -c "import json,sys;print(json.dumps({'session_id':sys.argv[2],'transcript_path':sys.argv[1],'cwd':sys.argv[4],'hook_event_name':sys.argv[3]}))" "$1" "$2" "$3" "$cwd"; }
 clearlock() { rm -f "$LOCKDIR/$1.lock" "$LOCKDIR/$1.last"; }
+
+# Builds the rich Stop-hook payload. Args: session five_hour_pct [cwd] [has_rl 1/0] [has_5h 1/0] [use_workspace 1/0]
+stopinput() {
+    "$PY" - "$@" <<'PYEOF'
+import json, sys
+session = sys.argv[1]; pct = sys.argv[2]
+cwd = sys.argv[3] if len(sys.argv) > 3 else "/tmp"
+has_rl = (sys.argv[4] if len(sys.argv) > 4 else "1") == "1"
+has_5h = (sys.argv[5] if len(sys.argv) > 5 else "1") == "1"
+use_ws = (sys.argv[6] if len(sys.argv) > 6 else "0") == "1"
+h = {"session_id": session, "hook_event_name": "Stop", "transcript_path": "x"}
+if use_ws:
+    h["workspace"] = {"current_dir": cwd}
+else:
+    h["cwd"] = cwd
+if has_rl:
+    rl = {}
+    if has_5h:
+        rl["five_hour"] = {"used_percentage": float(pct), "resets_at": 1738425600}
+    rl["seven_day"] = {"used_percentage": 41.2, "resets_at": 1738857600}
+    h["rate_limits"] = rl
+print(json.dumps(h))
+PYEOF
+}
 
 echo "relay trigger.py tests (token budgets: normal=150000 emergency=190000)"
 echo "--------------------------------"
@@ -108,6 +134,41 @@ out=$(invoke "$(hookinput /does/not/exist.jsonl $s UserPromptSubmit)"); rc=$?
 out=$(printf 'not-json' | "$PY" "$TRIGGER"); rc=$?
 [ -z "$out" ]; assert $? "garbage stdin stays silent"
 [ "$rc" = "0" ]; assert $? "garbage stdin exits 0"
+
+# ---- Plan-usage trigger (Stop hook reads rate_limits.five_hour.used_percentage) ----
+
+s=sp-below; clearlock $s
+out=$(invoke "$(stopinput $s 85 "$FIXTURES")"); [ -z "$out" ]; assert $? "plan 85% stays silent (below 90)"; clearlock $s
+
+s=sp-90; clearlock $s
+out=$(invoke "$(stopinput $s 90 "$FIXTURES")")
+[ -n "$out" ]; assert $? "plan 90% fires (inclusive)"
+echo "$out" | grep -qi 'plan'; assert $? "message names the plan limit"
+echo "$out" | grep -q '90'; assert $? "message reports the plan percentage"; clearlock $s
+
+s=sp-925; clearlock $s
+out=$(invoke "$(stopinput $s 92.5 "$FIXTURES")")
+[ -n "$out" ]; assert $? "plan 92.5% fires"
+echo "$out" | grep -q '92'; assert $? "fractional percentage reported"; clearlock $s
+
+s=sp-none; clearlock $s
+out=$(invoke "$(stopinput $s 99 "$FIXTURES" 0)"); [ -z "$out" ]; assert $? "no rate_limits stays silent (graceful)"; clearlock $s
+
+s=sp-no5h; clearlock $s
+out=$(invoke "$(stopinput $s 99 "$FIXTURES" 1 0)"); [ -z "$out" ]; assert $? "missing five_hour window stays silent"; clearlock $s
+
+s=sp-env; clearlock $s
+out=$(printf '%s' "$(stopinput $s 60 "$FIXTURES")" | RELAY_PLAN_THRESHOLD=50 "$PY" "$TRIGGER")
+[ -n "$out" ]; assert $? "RELAY_PLAN_THRESHOLD override fires at 60% when lowered to 50"; clearlock $s
+
+s=sp-lock; clearlock $s
+invoke "$(stopinput $s 95 "$FIXTURES")" >/dev/null
+out=$(invoke "$(stopinput $s 95 "$FIXTURES")"); [ -z "$out" ]; assert $? "second plan crossing stays silent (lock)"; clearlock $s
+
+s=sp-workspace; clearlock $s
+out=$(invoke "$(stopinput $s 95 "$FIXTURES" 1 1 1)")
+[ -n "$out" ]; assert $? "plan fires using workspace.current_dir when cwd absent"
+echo "$out" | grep -qF 'handoffs'; assert $? "workspace.current_dir used for handoff path"; clearlock $s
 
 echo "--------------------------------"
 echo "$PASS passed, $FAIL failed"

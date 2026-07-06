@@ -20,6 +20,7 @@ import datetime
 import json
 import os
 import re
+import subprocess
 import sys
 import urllib.request
 
@@ -188,6 +189,41 @@ def invoke_ollama(model, prompt):
         return json.loads(r.read()).get("response", "")
 
 
+def git_state(directory):
+    """Capture the REAL repository state deterministically (not model-guessed):
+    branch, last commit, uncommitted files, and diff summary. Returns a markdown
+    block, or "" if the directory isn't a git repo or git is unavailable."""
+    if not directory or not os.path.isdir(directory):
+        return ""
+
+    def _git(*a):
+        try:
+            r = subprocess.run(["git", "-C", directory] + list(a),
+                               capture_output=True, text=True, timeout=10)
+            return r.stdout.strip() if r.returncode == 0 else ""
+        except (OSError, subprocess.SubprocessError):
+            return ""
+
+    if _git("rev-parse", "--is-inside-work-tree") != "true":
+        return ""
+    branch = _git("branch", "--show-current")
+    last = _git("log", "-1", "--oneline")
+    status = _git("status", "--short")
+    diffstat = _git("diff", "--stat")
+    lines = ["", "## Repository State (captured by Relay)"]
+    if branch:
+        lines.append("**Branch:** " + branch)
+    if last:
+        lines.append("**Last commit:** " + last)
+    if status:
+        lines.append("\n**Uncommitted changes:**\n```\n" + status + "\n```")
+    else:
+        lines.append("\n**Uncommitted changes:** none (working tree clean)")
+    if diffstat:
+        lines.append("\n**Diff summary:**\n```\n" + diffstat + "\n```")
+    return "\n".join(lines) + "\n"
+
+
 def build_prompt(convo):
     return (
         "You are writing a session handoff so another AI agent can resume this work. "
@@ -294,11 +330,12 @@ def main(argv=None):
         return _fail("The local model returned nothing.")
 
     header = "<!-- Generated locally by Relay via Ollama ({}). Source session: {} -->\n\n".format(model, meta["session_id"])
+    gitmd = git_state(meta.get("cwd"))
     with open(handoff_file, "w", encoding="utf-8") as f:
-        f.write(header + markdown)
+        f.write(header + markdown + gitmd)
 
     print("\nHandoff saved to: " + handoff_file)
-    _rec_log("ok: " + handoff_file)
+    _rec_log("ok: {} (git_state={})".format(handoff_file, "yes" if gitmd else "no"))
     return 0
 
 

@@ -179,6 +179,29 @@ $convo
 "@
 }
 
+function Get-GitState($dir) {
+    # Capture the REAL repo state deterministically (not model-guessed). Returns
+    # a markdown block, or '' if not a git repo / git unavailable.
+    if (-not $dir -or -not (Test-Path $dir)) { return '' }
+    if (-not (Get-Command git -ErrorAction SilentlyContinue)) { return '' }
+    function _g([string[]]$a) {
+        try { $o = & git -C $dir @a 2>$null; if ($LASTEXITCODE -eq 0) { return (($o -join "`n").Trim()) } else { return '' } } catch { return '' }
+    }
+    if ((_g @('rev-parse','--is-inside-work-tree')) -ne 'true') { return '' }
+    $branch = _g @('branch','--show-current')
+    $last = _g @('log','-1','--oneline')
+    $status = _g @('status','--short')
+    $diffstat = _g @('diff','--stat')
+    $sb = New-Object System.Text.StringBuilder
+    [void]$sb.AppendLine(''); [void]$sb.AppendLine('## Repository State (captured by Relay)')
+    if ($branch) { [void]$sb.AppendLine("**Branch:** $branch") }
+    if ($last)   { [void]$sb.AppendLine("**Last commit:** $last") }
+    if ($status) { [void]$sb.AppendLine(''); [void]$sb.AppendLine('**Uncommitted changes:**'); [void]$sb.AppendLine('```'); [void]$sb.AppendLine($status); [void]$sb.AppendLine('```') }
+    else         { [void]$sb.AppendLine(''); [void]$sb.AppendLine('**Uncommitted changes:** none (working tree clean)') }
+    if ($diffstat) { [void]$sb.AppendLine(''); [void]$sb.AppendLine('**Diff summary:**'); [void]$sb.AppendLine('```'); [void]$sb.AppendLine($diffstat); [void]$sb.AppendLine('```') }
+    return $sb.ToString()
+}
+
 # ---- Main ------------------------------------------------------------------
 if ($Help) { Show-Usage; exit 0 }
 
@@ -248,7 +271,8 @@ $markdown = Invoke-Ollama $model $prompt
 if (-not $markdown -or -not $markdown.Trim()) { Fail "The local model returned nothing." }
 
 $header = "<!-- Generated locally by Relay via Ollama ($model). Source session: $($meta.SessionId) -->`n`n"
-Set-Content -Path $handoffFile -Value ($header + $markdown) -Encoding utf8
+$gitState = Get-GitState $meta.Cwd
+Set-Content -Path $handoffFile -Value ($header + $markdown + $gitState) -Encoding utf8
 
 Write-Host "`nHandoff saved to: $handoffFile" -ForegroundColor Green
-Write-RecLog "ok: $handoffFile"
+Write-RecLog "ok: $handoffFile (git_state=$(if ($gitState) { 'yes' } else { 'no' }))"

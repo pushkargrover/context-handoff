@@ -86,6 +86,37 @@ g.close()
 check("USER: real msg" in rr.clean_conversation(g.name), "garbage/blank lines skipped")
 os.unlink(g.name)
 
+# git_state: non-repo returns empty
+import subprocess as _sp
+nonrepo = tempfile.mkdtemp()
+check(rr.git_state(nonrepo) == "", "git_state returns empty for a non-repo dir")
+check(rr.git_state("/does/not/exist") == "", "git_state returns empty for a missing dir")
+
+# git_state: real repo with an uncommitted change captures the facts
+def _has_git():
+    try:
+        _sp.run(["git", "--version"], capture_output=True, timeout=10)
+        return True
+    except (OSError, _sp.SubprocessError):
+        return False
+
+if _has_git():
+    repo = tempfile.mkdtemp()
+    env = dict(os.environ, GIT_AUTHOR_NAME="t", GIT_AUTHOR_EMAIL="t@t", GIT_COMMITTER_NAME="t", GIT_COMMITTER_EMAIL="t@t")
+    _sp.run(["git", "-C", repo, "init", "-q"], capture_output=True, env=env)
+    with open(os.path.join(repo, "a.txt"), "w") as f:
+        f.write("hello\n")
+    _sp.run(["git", "-C", repo, "add", "a.txt"], capture_output=True, env=env)
+    _sp.run(["git", "-C", repo, "commit", "-qm", "init"], capture_output=True, env=env)
+    with open(os.path.join(repo, "b.txt"), "w") as f:
+        f.write("new file\n")          # uncommitted change
+    gs = rr.git_state(repo)
+    check("## Repository State" in gs, "git_state emits a Repository State section")
+    check("b.txt" in gs, "git_state lists the uncommitted file")
+    check("Last commit" in gs and "init" in gs, "git_state includes the last commit")
+else:
+    print("  SKIP  git not available for git_state repo test")
+
 print("------------------------------")
 print("%d passed, %d failed" % (passed, failed))
 sys.exit(1 if failed else 0)

@@ -7,7 +7,7 @@
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-3fb950?style=flat-square&labelColor=0b0e14)
 ![License](https://img.shields.io/badge/license-MIT-58a6ff?style=flat-square&labelColor=0b0e14)
 ![Dependencies](https://img.shields.io/badge/dependencies-zero-3fb950?style=flat-square&labelColor=0b0e14)
-![Tests](https://img.shields.io/badge/tests-93%20passing-3fb950?style=flat-square&labelColor=0b0e14)
+![Tests](https://img.shields.io/badge/tests-106%20passing-3fb950?style=flat-square&labelColor=0b0e14)
 ![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-d29922?style=flat-square&labelColor=0b0e14)
 
 **Never lose your session progress again.** Relay monitors your context usage live and automatically writes a structured handoff document at 90%, before compaction erases your work. Resume in any AI agent: Claude, Codex, Gemini, Copilot.
@@ -49,6 +49,7 @@ every turn         ==>  read the real token count from the session transcript
 
 - **Real counts, not estimates.** Relay reads the exact token count that every assistant message records in the transcript.
 - **Token budgets, not fake percentages.** The real context window isn't exposed to hooks and varies by model, so Relay fires on an absolute token budget and lets `PreCompact` — which *does* know the true limit — handle the exact near-full moment for any model.
+- **Deterministic repository state.** Every handoff includes a captured-by-Relay section with the real git branch, last commit, uncommitted files, and diff summary — *facts read from git*, not the model's guess — so the next agent sees the exact working state.
 - **Covers long single turns.** The per-turn check runs at turn boundaries; a separate, throttled mid-task check (after tool calls, at a higher token budget) catches a long agentic task before it hits the wall.
 - **Watches your 5-hour plan usage.** On Pro/Max, Relay reads the real `rate_limits.five_hour.used_percentage` that Claude Code puts in the `Stop`-hook payload and writes a handoff when your rolling plan limit hits 90% — so a lockout never catches you empty-handed. No token, no API call, no dependency.
 - **Zero dependencies.** No daemon, nothing to keep running. The check rides on a hook that already fires each turn.

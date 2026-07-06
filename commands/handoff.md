@@ -41,6 +41,9 @@ Generate a comprehensive session handoff document and save it to disk so work ca
 ## Current State
 [What is working right now. What the system looks like. Current task status.]
 
+## Repository State
+[Run `git status --short` and `git diff --stat`, and record the branch and last commit, so the next agent sees the exact working state.]
+
 ## Open Questions / Blockers
 [Unresolved issues, ambiguous requirements, things needing investigation]
 

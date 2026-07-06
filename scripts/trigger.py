@@ -267,9 +267,11 @@ Required structure (fill every section from this conversation):
 ### Files Created or Modified
 ### Commands Run
 ## Current State
+## Repository State
+(run: git status --short and git diff --stat; record the branch and last commit)
 ## Open Questions / Blockers
 ## Next Steps
-(ordered, concrete)
+(ordered and concrete, including the exact command to run to continue or verify)
 ## Key File Paths
 ## Instructions for Next Agent
 (conventions, warnings, non-obvious context)

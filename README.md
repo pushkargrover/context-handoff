@@ -27,6 +27,8 @@ Type these **inside Claude Code** (not a terminal; they are `/` slash commands):
 
 Then restart Claude Code so hooks load at session start. No npm, no pip, no runtime.
 
+Run **`/relay-doctor`** any time to check what's available on your machine (core triggers, git-backed Repository State, Ollama local mode).
+
 ---
 
 ## What it does
@@ -157,13 +159,24 @@ The script only **detects**. Claude does the **synthesizing**, because only the 
 
 ---
 
-## Platform support
+## Platform support & requirements
 
-| Platform | Status |
-| --- | --- |
-| Windows (PowerShell 5.1+) | Supported |
-| macOS / Linux (`sh` + Python 3) | Supported |
-| Plain claude.ai chat | Not supported (no hook or filesystem access there) |
+Relay is fully cross-platform — no hardcoded paths, and it picks the right runtime per OS automatically (PowerShell on Windows, `sh` + Python 3 on macOS/Linux). All core paths resolve from the user's home and the plugin root at runtime.
+
+| Platform | Core handoff triggers | What's needed |
+| --- | --- | --- |
+| Windows | ✅ | PowerShell 5.1+ (built in) |
+| macOS / Linux | ✅ | **Python 3** (near-universal; the trigger no-ops silently if absent) |
+| Plain claude.ai chat | ❌ | no hooks/filesystem there |
+
+Optional capabilities and what they need (each degrades gracefully if missing):
+
+| Capability | Requires | If missing |
+| --- | --- | --- |
+| Repository State in handoffs | `git` on PATH | section is omitted |
+| Local-model handoff / lockout recovery (`/handoff-local`, `relay-recover`, auto-recover) | [Ollama](https://ollama.com) + a pulled model | those features no-op; normal Claude-written handoffs are unaffected |
+
+> Line endings are pinned via `.gitattributes` (`*.sh`/`*.py` = LF), so the Unix scripts stay runnable when installed on macOS/Linux.
 
 ---
 
